@@ -1,0 +1,18 @@
+# Dream Server -- macOS Apple Silicon Overlay
+# llama-server runs natively on macOS host with Metal acceleration
+# All other services remain in Docker, reaching the host via host.docker.internal
+#
+# Use with: docker compose -f docker-compose.base.yml -f installers/macos/docker-compose.macos.yml up -d
+
+services:
+  llama-server:
+    deploy:
+      replicas: 0    # Disabled -- running natively on macOS host via Metal
+
+  dashboard-api:
+    environment:
+      - OLLAMA_URL=http://host.docker.internal:8080
+
+  open-webui:
+    environment:
+      OPENAI_API_BASE_URL: "http://host.docker.internal:8080/v1"

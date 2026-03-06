@@ -1,0 +1,53 @@
+#!/bin/bash
+# ============================================================================
+# Dream Server macOS Installer -- Constants
+# ============================================================================
+# Part of: installers/macos/lib/
+# Purpose: Version, paths, colors, configuration defaults
+#
+# Canonical source: installers/lib/constants.sh (keep VERSION in sync)
+#
+# Modder notes:
+#   Change DS_VERSION for custom builds. Must match constants.sh VERSION.
+# ============================================================================
+
+DS_VERSION="2.0.0-strix-halo"
+
+# Install location (override via $DREAM_HOME)
+DS_INSTALL_DIR="${DREAM_HOME:-$HOME/dream-server}"
+
+# Logging
+DS_LOG_FILE="/tmp/dream-server-install-macos.log"
+
+# Native llama-server paths (Metal acceleration on Apple Silicon)
+LLAMA_SERVER_DIR="${DS_INSTALL_DIR}/bin"
+LLAMA_SERVER_BIN="${LLAMA_SERVER_DIR}/llama-server"
+LLAMA_SERVER_PID_FILE="${DS_INSTALL_DIR}/data/.llama-server.pid"
+LLAMA_SERVER_LOG="${DS_INSTALL_DIR}/data/llama-server.log"
+
+# llama.cpp release for macOS Metal build (update when new releases ship)
+LLAMA_CPP_RELEASE_TAG="b5570"
+LLAMA_CPP_MACOS_ASSET="llama-${LLAMA_CPP_RELEASE_TAG}-bin-macos-arm64.zip"
+LLAMA_CPP_MACOS_URL="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_CPP_RELEASE_TAG}/${LLAMA_CPP_MACOS_ASSET}"
+
+# Docker
+DOCKER_COMPOSE_CMD="docker compose"
+MIN_DOCKER_VERSION="4.20.0"
+
+# Minimum macOS version (Ventura 13.0 for Metal 3)
+MIN_MACOS_MAJOR=13
+
+# Timing
+INSTALL_START_EPOCH=$(date +%s)
+
+# ============================================================================
+# Colors -- green phosphor CRT theme (ANSI)
+# ============================================================================
+RED='\033[0;31m'
+GRN='\033[0;32m'         # Standard green -- body text
+BGRN='\033[1;32m'        # Bright green -- emphasis, success, headings
+DGRN='\033[2;32m'        # Dim green -- secondary text, lore
+AMB='\033[0;33m'         # Amber -- warnings, ETA labels
+WHT='\033[1;37m'         # White -- key URLs
+NC='\033[0m'             # Reset
+CURSOR='█'               # Block cursor for typing
