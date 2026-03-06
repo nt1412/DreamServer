@@ -30,7 +30,7 @@ case "$target" in
                 else
                     echo "[ERROR] PowerShell (pwsh) not found in this shell."
                     echo "        Run this from Windows PowerShell instead:"
-                    echo "        .\\installers\\windows.ps1"
+                    echo "        .\\install.ps1"
                     exit 1
                 fi
                 ;;
