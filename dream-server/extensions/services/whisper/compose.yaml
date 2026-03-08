@@ -7,14 +7,10 @@ services:
       - no-new-privileges:true
     environment:
       - WHISPER__TTL=86400
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        sed -i 's/vad_filter=effective_vad_filter,/vad_filter=effective_vad_filter, vad_parameters={"threshold": 0.3, "min_silence_duration_ms": 400, "min_speech_duration_ms": 50, "speech_pad_ms": 200},/' /home/ubuntu/speaches/src/speaches/routers/stt.py
-        exec uvicorn --factory speaches.main:create_app
+    entrypoint: ["/app/docker-entrypoint.sh"]
     volumes:
       - ./data/whisper:/home/ubuntu/.cache/huggingface/hub
+      - ./extensions/services/whisper/docker-entrypoint.sh:/app/docker-entrypoint.sh:ro
     ports:
       - "${WHISPER_PORT:-9000}:8000"
     deploy:
@@ -26,7 +22,7 @@ services:
           cpus: '1.0'
           memory: 1G
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
