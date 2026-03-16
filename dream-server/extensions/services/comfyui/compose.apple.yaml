@@ -26,6 +26,7 @@ services:
         reservations:
           cpus: '2.0'
           memory: 2G
+    command: ["--cpu"]
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8188"]
       interval: 30s
