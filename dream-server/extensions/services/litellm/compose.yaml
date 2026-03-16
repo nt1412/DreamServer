@@ -7,6 +7,8 @@ services:
       - no-new-privileges:true
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_KEY:?LITELLM_KEY must be set in .env}
+      - LITELLM_LLM_URL=${LITELLM_LLM_URL:-http://llama-server:8080/v1}
+      # To enable monitoring: LITELLM_LLM_URL=http://token-spy:8084/v1
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}

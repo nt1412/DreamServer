@@ -66,7 +66,8 @@ services:
       - no-new-privileges:true
     environment:
       ENABLE_OLLAMA_API: "false"
-      OPENAI_API_BASE_URL: "${LLM_API_URL:-http://llama-server:8080}/v1"
+      OPENAI_API_BASE_URL: "${WEBUI_LLM_URL:-${LLM_API_URL:-http://llama-server:8080}}/v1"
+      # To enable monitoring: WEBUI_LLM_URL=http://token-spy:8081
       OPENAI_API_KEY: ""
       WEBUI_AUTH: "${WEBUI_AUTH:-true}"
       WEBUI_SECRET_KEY: "${WEBUI_SECRET:?Set WEBUI_SECRET in .env}"

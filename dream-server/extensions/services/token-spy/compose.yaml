@@ -1,4 +1,16 @@
 # Token Spy — LLM usage monitoring service
+#
+# When TOKEN_SPY_AUTH_MODE=local, starts per-service monitoring
+# instances inside the same container (ports 8081-8084). All share
+# one SQLite database, so the dashboard at :3005 shows all agents.
+#
+# Port mapping:
+#   8080 — main instance (dashboard, cloud/agent monitoring)
+#   8081 — open-webui monitoring
+#   8082 — perplexica monitoring
+#   8083 — openclaw monitoring
+#   8084 — litellm monitoring
+#   8085 — n8n workflow monitoring
 services:
   token-spy:
     build:
@@ -13,7 +25,10 @@ services:
     volumes:
       - ./data/token-spy:/app/data
     environment:
-      - OLLAMA_URL=${LLM_API_URL:-http://llama-server:8080}
+      - API_PROVIDER=openai
+      - OPENAI_UPSTREAM=${LLM_API_URL:-http://llama-server:8080}
+      - AGENT_NAME=${TOKEN_SPY_AGENT_NAME:-token-spy}
+      - AUTH_MODE=${TOKEN_SPY_AUTH_MODE:-}
     deploy:
       resources:
         limits:

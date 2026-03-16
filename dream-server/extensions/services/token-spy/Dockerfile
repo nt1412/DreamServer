@@ -9,6 +9,9 @@ COPY . .
 
 RUN mkdir -p /app/data
 
-EXPOSE 8080
+EXPOSE 8080 8081 8082 8083 8084 8085
 
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${UVICORN_PORT:-8080} --log-level info"]
+COPY start-monitoring.sh /app/start-monitoring.sh
+RUN chmod +x /app/start-monitoring.sh
+
+CMD ["sh", "-c", "/app/start-monitoring.sh"]

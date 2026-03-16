@@ -37,6 +37,7 @@ from providers import ProviderRegistry
 # ── Configuration ────────────────────────────────────────────────────────────
 
 AGENT_NAME = os.environ.get("AGENT_NAME", "unknown")
+AUTH_MODE = os.environ.get("AUTH_MODE", "").lower()
 START_TIME = time.time()
 
 # Provider configuration
@@ -258,7 +259,14 @@ _security_scheme = HTTPBearer(auto_error=False)
 async def verify_api_key(
     credentials: HTTPAuthorizationCredentials = Security(_security_scheme),
 ):
-    """Verify API key for protected endpoints."""
+    """Verify API key for protected endpoints.
+
+    When AUTH_MODE=local, skip auth on proxy routes to allow internal
+    Docker services (Open WebUI, Perplexica) to route through Token Spy
+    for local LLM monitoring without needing the API key.
+    """
+    if AUTH_MODE == "local":
+        return credentials.credentials if credentials else "local"
     if not credentials:
         raise HTTPException(
             status_code=401,

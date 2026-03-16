@@ -16,6 +16,7 @@ const path = require('path');
 const token = process.env.OPENCLAW_GATEWAY_TOKEN || '';
 const EXTERNAL_PORT = process.env.OPENCLAW_EXTERNAL_PORT || '7860';
 const LLM_MODEL = process.env.LLM_MODEL || '';
+const OPENCLAW_LLM_URL = process.env.OPENCLAW_LLM_URL || '';
 const CONFIG_PATH = path.join(process.env.HOME || '/home/node', '.openclaw', 'openclaw.json');
 const HTML_PATH = '/app/dist/control-ui/index.html';
 const JS_PATH = '/app/dist/control-ui/auto-token.js';
@@ -89,6 +90,18 @@ try {
           if (d.subagents) d.subagents.model = fullNew;
           console.log(`[inject-token] updated agent model refs: ${fullOld} -> ${fullNew}`);
         }
+      }
+    }
+  }
+
+  // Override LLM baseUrl for Token Spy monitoring (if OPENCLAW_LLM_URL is set)
+  const providers = config.models?.providers || config.providers || {};
+  if (OPENCLAW_LLM_URL && Object.keys(providers).length > 0) {
+    for (const [name, provider] of Object.entries(providers)) {
+      if (provider.baseUrl) {
+        const oldUrl = provider.baseUrl;
+        provider.baseUrl = OPENCLAW_LLM_URL;
+        console.log(`[inject-token] monitoring: provider ${name} baseUrl: ${oldUrl} -> ${OPENCLAW_LLM_URL}`);
       }
     }
   }

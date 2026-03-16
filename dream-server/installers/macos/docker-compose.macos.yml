@@ -55,9 +55,13 @@ services:
       # Static host hardware info written to .env by install-macos.sh (Phase 2).
       - HOST_RAM_GB=${HOST_RAM_GB:-0}   # explicit override; base.yml also carries this for other platforms
 
+  token-spy:
+    environment:
+      - OPENAI_UPSTREAM=http://host.docker.internal:8080
+
   open-webui:
     depends_on:
       llama-server-ready:
         condition: service_healthy
     environment:
-      OPENAI_API_BASE_URL: "http://host.docker.internal:8080/v1"
+      OPENAI_API_BASE_URL: "${WEBUI_LLM_URL:-http://host.docker.internal:8080}/v1"
