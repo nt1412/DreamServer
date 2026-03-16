@@ -1,8 +1,7 @@
 """Tests for main.py — core endpoints and helper functions."""
 
-import os
 import subprocess
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -177,7 +176,7 @@ class TestBuildApiStatus:
 
     @pytest.mark.asyncio
     async def test_returns_full_structure(self, monkeypatch):
-        from models import GPUInfo, ServiceStatus, DiskUsage, BootstrapStatus, ModelInfo
+        from models import GPUInfo, BootstrapStatus, ModelInfo
 
         gpu = GPUInfo(
             name="RTX 4090", memory_used_mb=2048, memory_total_mb=24576,

@@ -1,9 +1,7 @@
 """Tests for features.py — calculate_feature_status with Apple Silicon fallback."""
 
 import os
-from unittest.mock import patch, AsyncMock, MagicMock
-
-import pytest
+from unittest.mock import patch, AsyncMock
 
 
 class TestCalculateFeatureStatusAppleFallback:
@@ -184,7 +182,6 @@ class TestCalculateFeatureStatusGeneral:
 class TestFeatureEnableInstructions:
 
     def test_returns_instructions_for_known_feature(self, test_client, monkeypatch):
-        import config
         test_features = [
             {"id": "chat", "name": "Chat", "description": "AI Chat",
              "icon": "MessageSquare", "category": "inference",

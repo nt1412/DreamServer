@@ -1,10 +1,6 @@
 """Tests for routers/agents.py — agent monitoring endpoints."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
-
-from agent_monitor import get_full_agent_metrics
+from unittest.mock import AsyncMock
 
 
 # --- GET /api/agents/metrics ---

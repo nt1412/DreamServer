@@ -2,9 +2,7 @@
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 
 # --- GET /api/version ---
@@ -24,7 +22,6 @@ class TestGetVersion:
         monkeypatch.setattr(updates_mod, "INSTALL_DIR", str(version_dir))
 
         # Mock urllib to simulate GitHub check failure (isolate version reading)
-        import urllib.request
         monkeypatch.setattr(
             "urllib.request.urlopen",
             MagicMock(side_effect=Exception("network unavailable")),
