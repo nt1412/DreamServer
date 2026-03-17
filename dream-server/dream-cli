@@ -788,6 +788,29 @@ cmd_enable() {
     local cat="${SERVICE_CATEGORIES[$service_id]:-optional}"
     [[ "$cat" == "core" ]] && { success "$service_id is a core service (always enabled)."; return 0; }
 
+    # Check GPU backend compatibility
+    local gpu_backends="${SERVICE_GPU_BACKENDS[$service_id]:-}"
+    if [[ -n "$gpu_backends" ]]; then
+        # Load current GPU_BACKEND from .env
+        local current_backend="${GPU_BACKEND:-nvidia}"
+        if [[ -f "$INSTALL_DIR/.env" ]]; then
+            current_backend=$(grep "^GPU_BACKEND=" "$INSTALL_DIR/.env" 2>/dev/null | cut -d= -f2 | tr -d '"' || echo "nvidia")
+        fi
+
+        # Check if current backend is in the supported list
+        if [[ ! " $gpu_backends " =~ " $current_backend " ]]; then
+            warn "$service_id may not work with GPU backend: $current_backend"
+            warn "  Supported backends: $gpu_backends"
+            warn "  Current backend: $current_backend"
+            read -p "  Continue anyway? [y/N] " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                log "Cancelled."
+                return 1
+            fi
+        fi
+    fi
+
     # Check inter-extension dependencies
     local deps="${SERVICE_DEPENDS[$service_id]}"
     if [[ -n "$deps" ]]; then
