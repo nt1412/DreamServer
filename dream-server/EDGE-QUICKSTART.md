@@ -104,7 +104,7 @@ docker compose -f docker-compose.edge.yml --profile workflows up -d
 | Service | Port | URL |
 |---------|------|-----|
 | Open WebUI | 3000 | http://localhost:3000 |
-| Ollama API | 11434 | http://localhost:11434 |
+| Ollama API | 8080 | http://localhost:8080 |
 | Whisper STT | 9000 | http://localhost:9000 |
 | Kokoro TTS | 8880 | http://localhost:8880 |
 | n8n | 5678 | http://localhost:5678 |

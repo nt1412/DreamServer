@@ -35,4 +35,7 @@ for s in scripts/build-capability-profile.sh scripts/classify-hardware.sh script
   test -x "$s" || { echo "[FAIL] script not executable: $s"; exit 1; }
 done
 
+echo "[contract] port contract parity"
+python3 tests/contracts/test-port-contracts.py
+
 echo "[PASS] installer contracts"
