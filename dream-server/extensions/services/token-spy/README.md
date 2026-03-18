@@ -71,3 +71,56 @@ providers/
 ```
 
 Add new providers by subclassing `LLMProvider` and decorating with `@register_provider("name")`.
+
+## Local LLM Monitoring
+
+Track token usage across DreamServer services by routing their LLM traffic through Token Spy. Each service gets its own monitoring instance (unique agent name) inside a single container, sharing one SQLite database. The dashboard at `:3005` shows all agents together.
+
+### Quick Start
+
+Add to your `.env` and restart the affected services:
+
+```bash
+# Enable Token Spy auth bypass for internal services
+TOKEN_SPY_AUTH_MODE=local
+
+# Route Open WebUI through Token Spy
+WEBUI_LLM_URL=http://token-spy:8081
+
+# Route Perplexica through Token Spy
+PERPLEXICA_LLM_URL=http://token-spy:8082/v1
+
+# Route OpenClaw through Token Spy
+OPENCLAW_LLM_URL=http://token-spy:8083/v1
+
+# Route LiteLLM through Token Spy
+LITELLM_LLM_URL=http://token-spy:8084/v1
+```
+
+Then restart:
+```bash
+docker compose up -d token-spy open-webui perplexica openclaw litellm
+```
+
+For n8n workflows, create an OpenAI credential in the n8n UI with Base URL = `http://token-spy:8085`.
+
+### Port Mapping
+
+| Port | Agent Name | Service |
+|------|-----------|---------|
+| 8080 | token-spy | Main instance (dashboard, cloud/agent monitoring) |
+| 8081 | open-webui | Open WebUI chat |
+| 8082 | perplexica | Perplexica deep research |
+| 8083 | openclaw | OpenClaw agents |
+| 8084 | litellm | LiteLLM gateway |
+| 8085 | n8n | n8n workflows |
+
+Monitoring instances only start when `TOKEN_SPY_AUTH_MODE=local`. Off by default — no behavior change for existing installs.
+
+### OpenClaw Browser Access
+
+OpenClaw's Control UI requires a token in the URL hash for Docker deployments:
+```
+http://localhost:7860/#token=YOUR_OPENCLAW_TOKEN
+```
+Find your token: `grep OPENCLAW_TOKEN .env`
