@@ -116,7 +116,8 @@ fi
 
 # Collect extension diagnostics (wrapped in function to allow local variables)
 collect_extension_diagnostics() {
-    local GPU_BACKEND="${GPU_BACKEND:-nvidia}"
+    # Use outer GPU_BACKEND or default to nvidia (don't make local to avoid set -u issues)
+    local backend="${GPU_BACKEND-nvidia}"
     local EXT_DIAG_ITEMS=()
 
     for sid in "${SERVICE_IDS[@]}"; do
@@ -162,7 +163,7 @@ collect_extension_diagnostics() {
 
         # Check GPU backend compatibility
         local gpu_backends="${SERVICE_GPU_BACKENDS[$sid]:-}"
-        if [[ -n "$gpu_backends" && ! " $gpu_backends " =~ " $GPU_BACKEND " ]]; then
+        if [[ -n "$gpu_backends" && ! " $gpu_backends " =~ " $backend " ]]; then
             issues+=("gpu_backend_incompatible")
         fi
 
