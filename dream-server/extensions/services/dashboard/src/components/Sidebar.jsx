@@ -33,12 +33,12 @@ export default function Sidebar({ status, collapsed, onToggle }) {
     [status]
   )
 
-  // Compute external links with auto-auth tokens (e.g. OpenClaw ?token=xxx)
+  // Compute external links with auto-auth tokens (e.g. OpenClaw #token=xxx)
   const externalLinks = useMemo(() => {
     const links = getSidebarExternalLinks({ status, getExternalUrl, apiLinks })
     return links.map(link => {
       if (link.key === 'openclaw' && serviceTokens.openclaw) {
-        return { ...link, url: `${link.url}/?token=${serviceTokens.openclaw}` }
+        return { ...link, url: `${link.url}/#token=${serviceTokens.openclaw}` }
       }
       return link
     })
