@@ -155,7 +155,7 @@ if ext_dir.exists():
             print(f"ERROR: Failed to parse manifest for {service_dir.name}: {e}", file=sys.stderr)
             print(f"  Manifest path: {manifest_path}", file=sys.stderr)
             print(f"  This service will be skipped. Fix the manifest or disable the service.", file=sys.stderr)
-            sys.exit(1)
+            continue
 
 # Include docker-compose.override.yml if it exists (user customizations)
 override = script_dir / "docker-compose.override.yml"
