@@ -288,9 +288,14 @@ MODELS_INI_EOF
             compose_ok=true
         fi
     fi
-    # Safety net: start any containers left in Created state (from missing image errors)
-    # When --no-build hits a missing image, compose aborts before starting other
-    # created-but-not-started containers. docker start catches those.
+    # Safety net: when --no-build hits a missing image, compose aborts before
+    # starting other containers. Some end up in "Created", others never got
+    # past "Creating" because their dependencies weren't ready yet.
+    # Step 1: start any containers already in Created state
+    docker start $(docker ps -a --filter status=created -q) 2>/dev/null || true
+    # Step 2: second compose pass picks up services whose deps are now healthy
+    $DOCKER_COMPOSE_CMD "${COMPOSE_FLAGS_ARR[@]}" up -d --no-build >> "$LOG_FILE" 2>&1 || true
+    # Step 3: catch any stragglers from the second pass
     docker start $(docker ps -a --filter status=created -q) 2>/dev/null || true
 
     if $compose_ok; then
