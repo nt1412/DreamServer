@@ -16,6 +16,7 @@ const path = require('path');
 const token = process.env.OPENCLAW_GATEWAY_TOKEN || '';
 const EXTERNAL_PORT = process.env.OPENCLAW_EXTERNAL_PORT || '7860';
 const LLM_MODEL = process.env.LLM_MODEL || '';
+const OPENCLAW_LLM_URL = process.env.OPENCLAW_LLM_URL || '';
 const CONFIG_PATH = path.join(process.env.HOME || '/home/node', '.openclaw', 'openclaw.json');
 const HTML_PATH = '/app/dist/control-ui/index.html';
 const JS_PATH = '/app/dist/control-ui/auto-token.js';
@@ -93,8 +94,34 @@ try {
     }
   }
 
+  // Override LLM baseUrl for Token Spy monitoring (if OPENCLAW_LLM_URL is set)
+  const providers = config.models?.providers || config.providers || {};
+  if (OPENCLAW_LLM_URL && Object.keys(providers).length > 0) {
+    for (const [name, provider] of Object.entries(providers)) {
+      if (provider.baseUrl) {
+        const oldUrl = provider.baseUrl;
+        provider.baseUrl = OPENCLAW_LLM_URL;
+        console.log(`[inject-token] monitoring: provider ${name} baseUrl: ${oldUrl} -> ${OPENCLAW_LLM_URL}`);
+      }
+    }
+  }
+
+  // Enable OpenAI-compatible HTTP API for integration with Open WebUI
+  if (!config.gateway.http) config.gateway.http = {};
+  if (!config.gateway.http.endpoints) config.gateway.http.endpoints = {};
+  config.gateway.http.endpoints.chatCompletions = { enabled: true };
+  console.log('[inject-token] enabled HTTP /v1/chat/completions endpoint');
+
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
   console.log('[inject-token] patched runtime config:', CONFIG_PATH);
+
+  // Log the browser-accessible URL with token for Docker users
+  if (token) {
+    console.log(`[inject-token] ┌─────────────────────────────────────────────┐`);
+    console.log(`[inject-token] │ OpenClaw Control UI:                        │`);
+    console.log(`[inject-token] │ http://localhost:${EXTERNAL_PORT}/#token=${token}`);
+    console.log(`[inject-token] └─────────────────────────────────────────────┘`);
+  }
 } catch (err) {
   console.error('[inject-token] config patch warning:', err.message);
 }
@@ -132,4 +159,83 @@ if (token && fs.existsSync(HTML_PATH)) {
 } else {
   if (!token) console.warn('[inject-token] no OPENCLAW_GATEWAY_TOKEN set, skipping UI injection');
   if (!fs.existsSync(HTML_PATH)) console.warn('[inject-token] Control UI HTML not found at', HTML_PATH);
+}
+
+// ── Part 3: Create merged config with HTTP API enabled ──────────────────────
+
+try {
+  const primaryConfigPath = process.env.OPENCLAW_CONFIG || '/config/openclaw.json';
+  if (fs.existsSync(primaryConfigPath)) {
+    const primary = JSON.parse(fs.readFileSync(primaryConfigPath, 'utf8'));
+    // Merge HTTP endpoint setting into primary config
+    if (!primary.gateway) primary.gateway = {};
+    if (!primary.gateway.http) primary.gateway.http = {};
+    if (!primary.gateway.http.endpoints) primary.gateway.http.endpoints = {};
+    primary.gateway.http.endpoints.chatCompletions = { enabled: true };
+
+    // Fix provider baseUrl to match the actual LLM endpoint (OLLAMA_URL env)
+    // The static config template uses "http://llama-server:8080/v1" which only
+    // resolves when llama-server runs in Docker. On macOS it runs natively on
+    // the host, so OLLAMA_URL is set to "http://host.docker.internal:8080".
+    const ollamaUrl = process.env.OLLAMA_URL || '';
+    if (ollamaUrl) {
+      const provs = primary.providers || {};
+      for (const [name, prov] of Object.entries(provs)) {
+        if (prov.baseUrl) {
+          const oldUrl = prov.baseUrl;
+          prov.baseUrl = ollamaUrl.replace(/\/$/, '') + '/v1';
+          if (oldUrl !== prov.baseUrl) {
+            console.log(`[inject-token] merged config: provider ${name} baseUrl: ${oldUrl} -> ${prov.baseUrl}`);
+          }
+        }
+      }
+    }
+
+    const mergedPath = '/tmp/openclaw-config.json';
+    fs.writeFileSync(mergedPath, JSON.stringify(primary, null, 2), 'utf8');
+    console.log('[inject-token] created merged config with HTTP API at', mergedPath);
+  }
+} catch (err) {
+  console.error('[inject-token] merged config warning:', err.message);
+}
+
+// ── Part 4: OpenAI-compat shim (inline) ─────────────────────────────────────
+// OpenClaw serves /v1/chat/completions but not /v1/models.
+// Open WebUI needs /v1/models to discover available models.
+// Start the shim directly in this process — it survives because inject-token.js
+// runs as a standalone node invocation before the gateway starts, but we fork
+// it as a detached child so it outlives this script.
+
+try {
+  const shimScript = `
+const http = require('http');
+const GATEWAY_PORT = 18789;
+const MODELS = JSON.stringify({
+  object: 'list',
+  data: [{ id: 'openclaw', object: 'model', created: ${Math.floor(Date.now() / 1000)}, owned_by: 'openclaw-gateway' }],
+});
+http.createServer((req, res) => {
+  if (req.url === '/v1/models') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(MODELS);
+  }
+  const proxy = http.request({ hostname: '127.0.0.1', port: GATEWAY_PORT, path: req.url, method: req.method, headers: req.headers }, (up) => {
+    res.writeHead(up.statusCode, up.headers);
+    up.pipe(res);
+  });
+  proxy.on('error', () => { res.writeHead(502); res.end('gateway unavailable'); });
+  req.pipe(proxy);
+}).listen(18790, '0.0.0.0', () => console.log('[openai-shim] /v1/models + proxy on :18790'));
+`;
+  fs.writeFileSync('/tmp/openai-shim.js', shimScript);
+
+  const { spawn } = require('child_process');
+  const child = spawn('node', ['/tmp/openai-shim.js'], {
+    detached: true,
+    stdio: 'inherit',
+  });
+  child.unref();
+  console.log('[inject-token] started openai-shim (pid %d)', child.pid);
+} catch (err) {
+  console.error('[inject-token] shim warning:', err.message);
 }
