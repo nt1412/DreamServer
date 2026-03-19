@@ -254,7 +254,7 @@ MODELS_INI_EOF
 
         ai "Validating service dependencies..."
         if ! validate_service_dependencies; then
-            ai_err "Service dependency validation failed"
+            ai_bad "Service dependency validation failed"
             ai "Some services depend on other services that are not enabled"
             ai "Enable required services or disable dependent services to continue"
             exit 1
@@ -269,7 +269,12 @@ MODELS_INI_EOF
     ai "I'm bringing systems online. You can breathe."
     echo ""
     compose_ok=false
-    $DOCKER_COMPOSE_CMD "${COMPOSE_FLAGS_ARR[@]}" up --build -d >> "$LOG_FILE" 2>&1 &
+    # Build locally-built images individually so one failure doesn't block the rest
+    for _svc in dashboard dashboard-api comfyui ape token-spy privacy-shield; do
+        $DOCKER_COMPOSE_CMD "${COMPOSE_FLAGS_ARR[@]}" build --no-cache "$_svc" >> "$LOG_FILE" 2>&1 || true
+    done
+    # Start everything — --no-build skips services whose images failed to build
+    $DOCKER_COMPOSE_CMD "${COMPOSE_FLAGS_ARR[@]}" up -d --no-build >> "$LOG_FILE" 2>&1 &
     compose_pid=$!
     if spin_task $compose_pid "Launching containers..."; then
         compose_ok=true
@@ -277,14 +282,21 @@ MODELS_INI_EOF
         printf "\r  ${AMB}⚠${NC} %-60s\n" "Some services still starting..."
         echo ""
         ai_warn "Some containers need more time. Retrying..."
-        $DOCKER_COMPOSE_CMD "${COMPOSE_FLAGS_ARR[@]}" up --build -d >> "$LOG_FILE" 2>&1 &
+        $DOCKER_COMPOSE_CMD "${COMPOSE_FLAGS_ARR[@]}" up -d --no-build >> "$LOG_FILE" 2>&1 &
         compose_pid=$!
         if spin_task $compose_pid "Waiting for remaining services..."; then
             compose_ok=true
         fi
     fi
-    # Final safety net: start any containers stuck in Created state
-    $DOCKER_COMPOSE_CMD "${COMPOSE_FLAGS_ARR[@]}" up -d >> "$LOG_FILE" 2>&1 || true
+    # Safety net: when --no-build hits a missing image, compose aborts before
+    # starting other containers. Some end up in "Created", others never got
+    # past "Creating" because their dependencies weren't ready yet.
+    # Step 1: start any containers already in Created state
+    docker start $(docker ps -a --filter status=created -q) 2>/dev/null || true
+    # Step 2: second compose pass picks up services whose deps are now healthy
+    $DOCKER_COMPOSE_CMD "${COMPOSE_FLAGS_ARR[@]}" up -d --no-build >> "$LOG_FILE" 2>&1 || true
+    # Step 3: catch any stragglers from the second pass
+    docker start $(docker ps -a --filter status=created -q) 2>/dev/null || true
 
     if $compose_ok; then
         printf "\r  ${BGRN}✓${NC} %-60s\n" "All containers launched"

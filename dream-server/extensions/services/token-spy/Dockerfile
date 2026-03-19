@@ -14,4 +14,7 @@ EXPOSE 8080 8081 8082 8083 8084 8085
 COPY start-monitoring.sh /app/start-monitoring.sh
 RUN chmod +x /app/start-monitoring.sh
 
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:${UVICORN_PORT:-8080}/health')" || exit 1
+
 CMD ["sh", "-c", "/app/start-monitoring.sh"]
