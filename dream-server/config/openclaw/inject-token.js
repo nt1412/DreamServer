@@ -198,7 +198,7 @@ try {
 
     const mergedPath = '/tmp/openclaw-config.json';
     fs.writeFileSync(mergedPath, JSON.stringify(primary, null, 2), 'utf8');
-    console.log('[inject-token] created merged config with HTTP API at', mergedPath);
+    console.log('[inject-token] created merged config at', mergedPath);
   }
 } catch (err) {
   console.error('[inject-token] merged config warning:', err.message);
