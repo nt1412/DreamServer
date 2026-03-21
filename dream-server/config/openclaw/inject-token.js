@@ -208,7 +208,12 @@ try {
 // OpenClaw serves /v1/chat/completions but not /v1/models.
 // Open WebUI needs /v1/models to discover available models.
 // This shim runs on port 18790, serves /v1/models, and proxies everything
-// else to the gateway on 18789. Respawns on crash with backoff.
+// else to the gateway on 18789.
+//
+// Crash handling (all three layers):
+//   1. Healthcheck: compose healthcheck hits :18790 — shim death → unhealthy
+//   2. Restart loop: shim self-restarts up to 5 times with backoff
+//   3. Logging: uncaughtException and server errors are logged to stderr
 
 if (process.env.OPENCLAW_HTTP_API === 'true') {
   try {
@@ -220,21 +225,45 @@ const MODELS = JSON.stringify({
   data: [{ id: 'openclaw', object: 'model', created: ${Math.floor(Date.now() / 1000)}, owned_by: 'openclaw-gateway' }],
 });
 
-http.createServer((req, res) => {
-  if (req.url === '/v1/models') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(MODELS);
-  }
-  const proxy = http.request({ hostname: '127.0.0.1', port: GATEWAY_PORT, path: req.url, method: req.method, headers: req.headers }, (up) => {
-    res.writeHead(up.statusCode, up.headers);
-    up.pipe(res);
+let restarts = 0;
+function startServer() {
+  const server = http.createServer((req, res) => {
+    if (req.url === '/v1/models') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(MODELS);
+    }
+    const proxy = http.request({ hostname: '127.0.0.1', port: GATEWAY_PORT, path: req.url, method: req.method, headers: req.headers }, (up) => {
+      res.writeHead(up.statusCode, up.headers);
+      up.pipe(res);
+    });
+    proxy.on('error', () => { res.writeHead(502); res.end('gateway unavailable'); });
+    req.pipe(proxy);
   });
-  proxy.on('error', () => { res.writeHead(502); res.end('gateway unavailable'); });
-  req.pipe(proxy);
-}).listen(18790, '0.0.0.0', () => console.log('[openai-shim] /v1/models + proxy on :18790'));
+  server.on('error', (err) => {
+    console.error('[openai-shim] server error: ' + err.message);
+    if (restarts < 5) {
+      restarts++;
+      const delay = restarts * 2000;
+      console.error('[openai-shim] restarting in ' + delay + 'ms (attempt ' + restarts + '/5)');
+      setTimeout(startServer, delay);
+    } else {
+      console.error('[openai-shim] too many failures, giving up — healthcheck will mark container unhealthy');
+    }
+  });
+  server.listen(18790, '0.0.0.0', () => {
+    restarts = 0;
+    console.log('[openai-shim] /v1/models + proxy on :18790');
+  });
+}
+startServer();
 
-// If the shim crashes, the Docker healthcheck (which hits :18790) will fail,
-// marking the container unhealthy. Docker restart: unless-stopped handles recovery.
+process.on('uncaughtException', (err) => {
+  console.error('[openai-shim] uncaught exception: ' + err.message);
+});
+process.on('SIGTERM', () => {
+  console.error('[openai-shim] received SIGTERM, shutting down');
+  process.exit(0);
+});
 `;
     fs.writeFileSync('/tmp/openai-shim.js', shimScript);
 
