@@ -106,11 +106,13 @@ try {
     }
   }
 
-  // Enable OpenAI-compatible HTTP API for integration with Open WebUI
-  if (!config.gateway.http) config.gateway.http = {};
-  if (!config.gateway.http.endpoints) config.gateway.http.endpoints = {};
-  config.gateway.http.endpoints.chatCompletions = { enabled: true };
-  console.log('[inject-token] enabled HTTP /v1/chat/completions endpoint');
+  // Enable OpenAI-compatible HTTP API (opt-in via OPENCLAW_HTTP_API=true)
+  if (process.env.OPENCLAW_HTTP_API === 'true') {
+    if (!config.gateway.http) config.gateway.http = {};
+    if (!config.gateway.http.endpoints) config.gateway.http.endpoints = {};
+    config.gateway.http.endpoints.chatCompletions = { enabled: true };
+    console.log('[inject-token] enabled HTTP /v1/chat/completions endpoint');
+  }
 
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
   console.log('[inject-token] patched runtime config:', CONFIG_PATH);
@@ -161,17 +163,20 @@ if (token && fs.existsSync(HTML_PATH)) {
   if (!fs.existsSync(HTML_PATH)) console.warn('[inject-token] Control UI HTML not found at', HTML_PATH);
 }
 
-// ── Part 3: Create merged config with HTTP API enabled ──────────────────────
+// ── Part 3: Create merged config ─────────────────────────────────────────────
 
 try {
   const primaryConfigPath = process.env.OPENCLAW_CONFIG || '/config/openclaw.json';
   if (fs.existsSync(primaryConfigPath)) {
     const primary = JSON.parse(fs.readFileSync(primaryConfigPath, 'utf8'));
-    // Merge HTTP endpoint setting into primary config
-    if (!primary.gateway) primary.gateway = {};
-    if (!primary.gateway.http) primary.gateway.http = {};
-    if (!primary.gateway.http.endpoints) primary.gateway.http.endpoints = {};
-    primary.gateway.http.endpoints.chatCompletions = { enabled: true };
+
+    // Enable HTTP API in merged config (opt-in via OPENCLAW_HTTP_API=true)
+    if (process.env.OPENCLAW_HTTP_API === 'true') {
+      if (!primary.gateway) primary.gateway = {};
+      if (!primary.gateway.http) primary.gateway.http = {};
+      if (!primary.gateway.http.endpoints) primary.gateway.http.endpoints = {};
+      primary.gateway.http.endpoints.chatCompletions = { enabled: true };
+    }
 
     // Fix provider baseUrl to match the actual LLM endpoint (OLLAMA_URL env)
     // The static config template uses "http://llama-server:8080/v1" which only
@@ -199,21 +204,22 @@ try {
   console.error('[inject-token] merged config warning:', err.message);
 }
 
-// ── Part 4: OpenAI-compat shim (inline) ─────────────────────────────────────
+// ── Part 4: OpenAI-compat shim (opt-in via OPENCLAW_HTTP_API=true) ──────────
 // OpenClaw serves /v1/chat/completions but not /v1/models.
 // Open WebUI needs /v1/models to discover available models.
-// Start the shim directly in this process — it survives because inject-token.js
-// runs as a standalone node invocation before the gateway starts, but we fork
-// it as a detached child so it outlives this script.
+// This shim runs on port 18790, serves /v1/models, and proxies everything
+// else to the gateway on 18789. Respawns on crash with backoff.
 
-try {
-  const shimScript = `
+if (process.env.OPENCLAW_HTTP_API === 'true') {
+  try {
+    const shimScript = `
 const http = require('http');
 const GATEWAY_PORT = 18789;
 const MODELS = JSON.stringify({
   object: 'list',
   data: [{ id: 'openclaw', object: 'model', created: ${Math.floor(Date.now() / 1000)}, owned_by: 'openclaw-gateway' }],
 });
+
 http.createServer((req, res) => {
   if (req.url === '/v1/models') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -226,16 +232,20 @@ http.createServer((req, res) => {
   proxy.on('error', () => { res.writeHead(502); res.end('gateway unavailable'); });
   req.pipe(proxy);
 }).listen(18790, '0.0.0.0', () => console.log('[openai-shim] /v1/models + proxy on :18790'));
-`;
-  fs.writeFileSync('/tmp/openai-shim.js', shimScript);
 
-  const { spawn } = require('child_process');
-  const child = spawn('node', ['/tmp/openai-shim.js'], {
-    detached: true,
-    stdio: 'inherit',
-  });
-  child.unref();
-  console.log('[inject-token] started openai-shim (pid %d)', child.pid);
-} catch (err) {
-  console.error('[inject-token] shim warning:', err.message);
+// If the shim crashes, the Docker healthcheck (which hits :18790) will fail,
+// marking the container unhealthy. Docker restart: unless-stopped handles recovery.
+`;
+    fs.writeFileSync('/tmp/openai-shim.js', shimScript);
+
+    const { spawn } = require('child_process');
+    const child = spawn('node', ['/tmp/openai-shim.js'], {
+      detached: true,
+      stdio: 'inherit',
+    });
+    child.unref();
+    console.log('[inject-token] started openai-shim (pid %d)', child.pid);
+  } catch (err) {
+    console.error('[inject-token] shim warning:', err.message);
+  }
 }
