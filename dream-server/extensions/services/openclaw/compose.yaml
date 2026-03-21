@@ -14,7 +14,7 @@ services:
       - OLLAMA_URL=${LLM_API_URL:-http://llama-server:8080}
       - OPENCLAW_LLM_URL=${OPENCLAW_LLM_URL:-}
       # To enable monitoring: OPENCLAW_LLM_URL=http://token-spy:8083/v1
-      - OPENCLAW_HTTP_API=${OPENCLAW_HTTP_API:-true}
+      - OPENCLAW_HTTP_API=${OPENCLAW_HTTP_API:-}
       - SEARXNG_BASE_URL=http://searxng:8080
     entrypoint: ["/bin/sh", "-c", "node /config/inject-token.js; export OPENCLAW_CONFIG=/tmp/openclaw-config.json; exec docker-entrypoint.sh node openclaw.mjs gateway --allow-unconfigured --bind lan"]
     volumes:
